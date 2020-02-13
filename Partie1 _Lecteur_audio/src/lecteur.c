@@ -31,7 +31,7 @@ int main(int argc, char const *argv[])
 
                 //recuperation du nom de l'audio
 
-    //si l'itulisateur oublie de mettre le nom du fichier en argument lors de l'execution.
+    //si l'utilisateur oublie de mettre le nom du fichier en argument lors de l'execution.
     if (argc <= 1 ) { 
         perror("vous avez oublié de mettre le nom du fichier en parametre.\n");
         printf("Entrez le ici : ");
@@ -39,7 +39,7 @@ int main(int argc, char const *argv[])
         *(caractereSaisie + strlen(caractereSaisie)-1) = '\0';
          }
          
-    //si l'itulisateur met le nom du fichier en argument lors de l'execution.
+    //si l'utilisateur met le nom du fichier en argument lors de l'execution.
     else
     {
         strcpy(caractereSaisie , argv[1]);
@@ -50,13 +50,21 @@ int main(int argc, char const *argv[])
     strcpy(fileName,audioPath);
     strcat(fileName , caractereSaisie);
  
-    /* ######### RECUPERATION DE LA DESCRIPTION DU FICHIER ############# */
 
+    /* ##################################################
+       #  Recuperation la frequence d echantillonnage,  #
+       #  la taille des echantillons et                 #
+       #  le nombre de canaux  de du fichier audio      #
+       ### ##############################################
+    */
     puts("");
     int lecture_audio = aud_readinit(fileName , &frequenceEchantillonnage, &tailleEchantillonnage, &canal);  
     puts("");
 
-    /* #### AFFICHAGE DES INFORMATIONS RELATIVES AU FICHIER AUDIO ########  */
+    //en cas d'erreur
+    if (lecture_audio == -1 ) return -1 ;
+
+    /* #### Afficher les informations relatives au fichier audio ########  */
     
     fprintf(stdout,
     " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
@@ -65,35 +73,38 @@ int main(int argc, char const *argv[])
     tailleEchantillonnage,
     canal);
 
-    /* ############ MODIFFICATION DES PARAMETRE AUDIO #############  */
+    /* ############ Modification des parametres audio #############  */
     // frequenceEchantillonnage =
     // tailleEchantillonnage =
     // canal = 
 
-    /* ##### recuperer la description du fichier audio #########  */
+    /* ##### recuperation du descripteur du fichier audio #########  */
     puts("");
      int ecriture_audio = aud_writeinit(frequenceEchantillonnage , tailleEchantillonnage , canal);
     puts("");
- 
+
+    //en cas d'erreur
+    if (ecriture_audio == -1) return -1 ;
+        
     bool arretDuSon = false;
     char audio_buffer[frequenceEchantillonnage];
-    int  readAudio ,writeAudio ;
-    while (!arretDuSon)
+    ssize_t  readAudio ,writeAudio ;
+
+    while (!arretDuSon )
     {
-        //
+        //lecture des echantillons dans audio_buffer à partir du descripteur de fichier (fd)
         readAudio = read (lecture_audio ,audio_buffer ,frequenceEchantillonnage);
 
-        //
+        if(readAudio != frequenceEchantillonnage) arretDuSon = true ;
+
+        //ecriture des echantillons à partir de audio_buffer
         writeAudio = write(ecriture_audio, audio_buffer , frequenceEchantillonnage);
 
-        // Clear the buffer after each pass
-		// bzero(audio_buffer, frequenceEchantillonnage);
+        if (writeAudio != frequenceEchantillonnage)   arretDuSon = true ;
 
-         if (readAudio != frequenceEchantillonnage || writeAudio != frequenceEchantillonnage) {
-             
-         arretDuSon = true ;
+        // vider le buffer apres chaque passage.
+		 bzero(audio_buffer, frequenceEchantillonnage);
 
-            }
     }
 
         close(lecture_audio);
