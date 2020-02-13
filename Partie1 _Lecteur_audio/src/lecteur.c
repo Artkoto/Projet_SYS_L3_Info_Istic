@@ -74,9 +74,13 @@ int main(int argc, char const *argv[])
     canal);
 
     /* ############ Modification des parametres audio #############  */
-    // frequenceEchantillonnage =
-    // tailleEchantillonnage =
-    // canal = 
+
+    //  frequenceEchantillonnage = frequenceEchantillonnage * 2 ;
+    //  frequenceEchantillonnage = frequenceEchantillonnage / 2 ;
+
+    //  tailleEchantillonnage = tailleEchantillonnage *2;
+
+    // canal = (canal == 2)? 1 : 2 ;
 
     /* ##### recuperation du descripteur du fichier audio #########  */
     puts("");
