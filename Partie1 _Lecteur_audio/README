@@ -42,8 +42,6 @@ de le copier dans le dossier "audio" situé à la racine du projet
 
 
 
-
-
                     #OBSERVATIONS
 
     1)_  Si on déclare une fausse fréquence d'échantillonnage à la sortie audio,
