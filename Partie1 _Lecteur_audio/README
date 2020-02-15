@@ -47,7 +47,7 @@ de le copier dans le dossier "audio" situé à la racine du projet
     1)_  Si on déclare une fausse fréquence d'échantillonnage à la sortie audio,
 on modifie la vitesse du son :
 
-> si la fréquence est deux fois plus grande , le sont est deux fois plus rapide 
+> si la fréquence est deux fois plus grande , le son est deux fois plus rapide 
 
 > si le frequence est deux fois plus petite, le son est deux fois plus lent 
 
