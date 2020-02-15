@@ -9,11 +9,6 @@
 #include <string.h>
 #include <audio.h>
 
-                 /* #########################################################
-                   #                          BINOME                       #
-                   #           AKOTO YAO ARNAUD  && KONE KAFONGO           #
-                   ######################################################### 
-                */
 
 #define MAX_FILENAME_SIZE 1024
 
@@ -79,10 +74,11 @@ int main(int argc, char const *argv[])
     //  frequenceEchantillonnage = frequenceEchantillonnage / 2 ;
 
     //  tailleEchantillonnage = tailleEchantillonnage *2;
+    //  tailleEchantillonnage = tailleEchantillonnage /2;
 
     // canal = (canal == 2)? 1 : 2 ;
 
-    /* ##### recuperation du descripteur du fichier audio #########  */
+    /* ##### recuperation du descripteur du périphérique de sortie audio #########  */
     puts("");
      int ecriture_audio = aud_writeinit(frequenceEchantillonnage , tailleEchantillonnage , canal);
     puts("");
