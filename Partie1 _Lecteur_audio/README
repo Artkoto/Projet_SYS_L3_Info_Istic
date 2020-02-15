@@ -31,7 +31,7 @@ et de les écrire dans la sortie audio avec respectivement les fonctions :
                     #INDICATIONS CONCERNANT LE PROJET
 
     Pour utiliser notre lecteur,  nous avons mis à votre disposition, un fichier "run.sh" 
-qui vous permet directement de les sons du répertoire "audio".
+qui vous permet de lire directement les sons du répertoire "audio".
 
     Ainsi pour lire par exemple le fichier "test.wav" situé dans le dossier "audio",
  il suffit d'entrer la commande :
