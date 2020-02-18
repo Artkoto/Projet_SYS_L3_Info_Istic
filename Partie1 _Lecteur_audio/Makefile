@@ -4,7 +4,7 @@
 CFLAGS = -Wall -c -I ./include
 
 #
-# Liens
+#  Liens
 #
 
 bin/lecteur: obj/lecteur.o   obj/audio.o
