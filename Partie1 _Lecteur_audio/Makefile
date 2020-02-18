@@ -34,7 +34,7 @@ clean :
 #
 
 test : obj/lecteur.o
-	   padsp ./bin/lecteur 
+	   padsp ./bin/lecteur $3
 
 #
 #compiler tous les fichiers

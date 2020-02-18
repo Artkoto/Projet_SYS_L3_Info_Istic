@@ -1,0 +1,65 @@
+                    
+                    #########################################################
+                    #                          BINOME                       #
+                    #           AKOTO YAO ARNAUD  && KONE KAFONGO           #
+                    #########################################################
+
+
+
+                 #DESCRIPTION DE LA MISE EN OEUVRE DU LECTEUR AUDIO
+
+    Pour l'élaboration  de notre lecteur audio, nous avons utilisé les fonctions :
+> int aud_readinit(char *filename, int *sample_rate, int *sample_size, int *channels);   
+> int aud_writeinit(int sample_rate, int sample_size, int channels);
+mises à notre disposition.  
+
+    La fonction "aud_readinit" permet de récupérer les paramètre du fichier audio "filname":
+> sa fréquence d'échantillonnage, 
+> sa taille d'échantillonnage, 
+> son canal de diffusion (stéréo ou mono).
+
+  On passe les paramètres obtenu par la fonction précédente 
+à la fonction aud_writeinit pour ouvrir le périphérique audio
+
+    après ces étapes , il suffit de lire les échantillons du fichier audio 
+et de les écrire dans la sortie audio avec respectivement les fonctions :
+> ssize_t read (int fd, void *buf, size_t count);
+> ssize_t write (int fd, const void *buf, size_t count);
+
+
+
+                    #INDICATIONS CONCERNANT LE PROJET
+
+    Pour utiliser notre lecteur,  nous avons mis à votre disposition, un fichier "run.sh" 
+qui vous permet de lire directement les sons du répertoire "audio".
+
+    Ainsi pour lire par exemple le fichier "test.wav" situé dans le dossier "audio",
+ il suffit d'entrer la commande :
+> (./run.sh test.wav) dans l'invite de commande.
+
+    Si vous voulez tester un autre fichier audio, il est important 
+de le copier dans le dossier "audio" situé à la racine du projet
+
+
+
+                    #OBSERVATIONS
+
+    1)_  Si on déclare une fausse fréquence d'échantillonnage à la sortie audio,
+on modifie la vitesse du son :
+
+> si la fréquence est deux fois plus grande , le son est deux fois plus rapide 
+
+> si le frequence est deux fois plus petite, le son est deux fois plus lent 
+
+
+    2)_ Si on déclare à la sortie audio que le fichier est mono, alors qu’il
+est en réalité en stéréo,
+on constate que le son est légèrement modifier et beaucoup plus lent.
+Cela est dû au fait que les échantillons "left" et "right" de la sortie stéréo 
+ne sont plus distingués et sont perçus comme étant deux échantillons monos différents.
+
+
+
+    3)_ Si l'on déclare une mauvaise taille d'échantillon, on entend un grésillement
+mais on arrive à percevoir la musique en fond.dans ce cas, l'échantillon est lu comme 
+un entier 8 bits non signés.
