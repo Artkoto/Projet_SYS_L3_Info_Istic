@@ -159,7 +159,13 @@ puts("");
             // } else {puts("oui_recvfrom");
               
             // }
-            if(readAudio != frequenceEchantillonnage) arretDuSon = true ;
+            if(readAudio != frequenceEchantillonnage) 
+            {
+                arretDuSon = true ;
+               // strcpy(audio_buffer , "fin")
+                err_sendto = sendto (fd, "fin" , 4, 0, (struct sockaddr*) &addrClient , tolen) ;
+
+            }
 
 
             // vider le buffer apres chaque passage.
@@ -167,7 +173,13 @@ puts("");
 
         }
 
-            close(lecture_audio);
+           int fini2 = close(lecture_audio);
+               if (fini2 == -1 )
+                {
+                    puts("non_close1");
+                } else puts("oui_close1");
+                //
+
 }
 
 

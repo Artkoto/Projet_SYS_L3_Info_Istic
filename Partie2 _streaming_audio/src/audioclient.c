@@ -48,17 +48,20 @@ int main(int argc, char const *argv[])
     addrServer.sin_port           = htons (8080);
     addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
 
-    int i = 200 ;
-   while(i > 0)
-   { /*sendto*/
-   i--;
+  /*sendto*/
+   
     int err_sendto;
     char  msg [1024] ;
     ////////////////
-        printf("Entrez le ici : ");
+    if (argc <= 1)
+     {   printf("Entrez le ici : ");
         fgets(msg ,( 1024 / sizeof(char)), stdin);
-        *(msg + strlen(msg)-1) = '\0';
-    int  sizeMsg = strlen(msg)+1;
+        *(msg + strlen(msg)-1) = '\0'; 
+    }
+    else
+    {strcpy(msg , argv[1]);
+    puts(msg);}
+    int  sizeMsg = strlen(msg)+1; 
     //flags = 0 ;
     socklen_t tolen  = sizeof (struct sockaddr_in);
 
@@ -83,10 +86,10 @@ int main(int argc, char const *argv[])
     {
         puts("non_recvfrom");
     } else {puts("oui_recvfrom");
-    printf("Received %d bytes from host %s port %d: %d \n", len,
+    printf("Received %d bytes from host %s port %d: %d , %d , %d  \n", len,
     inet_ntoa(addrServer.sin_addr),
      ntohs(addrServer.sin_port), 
-     pRecu.canal);   
+     pRecu.frequenceEchantillonnage, pRecu.tailleEchantillonnage , pRecu.canal);   
     }
     //
     puts("");
@@ -103,6 +106,8 @@ int main(int argc, char const *argv[])
     while (!arretDuSon )
     {
       
+       
+       
        len = recvfrom(fd , audio_buffer , sizeof(audio_buffer), 0 , (struct sockaddr*) &addrServer , &flen);
         sizeMsg2 = strlen(audio_buffer)+1;
         //
@@ -116,10 +121,17 @@ int main(int argc, char const *argv[])
         //ecriture des echantillons à partir de audio_buffer
         writeAudio = write(ecriture_audio, audio_buffer , pRecu.frequenceEchantillonnage);
 
-        if (writeAudio != pRecu.frequenceEchantillonnage)   arretDuSon = true ;
+        if (strcmp(audio_buffer,"fin") == 0 )  
+         {
+             arretDuSon = true ;
+             puts("fin");
+             }
+        else
+        {
+                 
 
         // vider le buffer apres chaque passage.
-		// bzero(audio_buffer, pRecu.frequenceEchantillonnage);
+		
 
          err_sendto = sendto (fd, audio_buffer , sizeMsg2, 0, (struct sockaddr*) &addrServer , tolen) ;
 
@@ -127,14 +139,12 @@ int main(int argc, char const *argv[])
             // {
             //     puts("non_sendto");
             // } else puts("oui_sendto");
+        }
+         bzero(audio_buffer, pRecu.frequenceEchantillonnage);
 
     }
 
         close(ecriture_audio);
-
-
-    //fin tqq
-    }
 
     /*close*/
 
