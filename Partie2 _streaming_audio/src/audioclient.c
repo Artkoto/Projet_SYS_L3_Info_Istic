@@ -46,7 +46,7 @@ int main(int argc, char const *argv[])
 
     addrServer.sin_family         = AF_INET ;
     addrServer.sin_port           = htons (8080);
-    addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
+    addrServer.sin_addr.s_addr    = inet_addr("127.0.0.1");
 
   /*sendto*/
    
@@ -119,7 +119,6 @@ int main(int argc, char const *argv[])
         // //
 
         //ecriture des echantillons à partir de audio_buffer
-        writeAudio = write(ecriture_audio, audio_buffer , pRecu.frequenceEchantillonnage);
 
         if (strcmp(audio_buffer,"fin") == 0 )  
          {
@@ -131,6 +130,8 @@ int main(int argc, char const *argv[])
                  
 
         // vider le buffer apres chaque passage.
+        writeAudio = write(ecriture_audio, audio_buffer , pRecu.frequenceEchantillonnage);
+
 		
 
          err_sendto = sendto (fd, audio_buffer , sizeMsg2, 0, (struct sockaddr*) &addrServer , tolen) ;

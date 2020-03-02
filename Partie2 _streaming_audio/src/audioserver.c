@@ -132,18 +132,18 @@ puts("");
 
         ///////////////////////////////////////////
          bool arretDuSon = false;
-        char audio_buffer[frequenceEchantillonnage];
-        int  sizeMsg = strlen(audio_buffer)+1;
+        char audio_buffer[pEnvoye.frequenceEchantillonnage];
+       // int  sizeMsg = strlen(audio_buffer)+1;
         ssize_t  readAudio  ;
 
         while (!arretDuSon )
         {
             //lecture des echantillons dans audio_buffer à partir du descripteur de fichier (fd)
-            readAudio = read (lecture_audio ,audio_buffer ,frequenceEchantillonnage);
-             sizeMsg = strlen(audio_buffer)+1;
+            readAudio = read (lecture_audio ,audio_buffer ,pEnvoye.frequenceEchantillonnage);
+            // sizeMsg = strlen(audio_buffer)+1;
             
             
-            err_sendto = sendto (fd, audio_buffer , sizeMsg, 0, (struct sockaddr*) &addrClient , tolen) ;
+            err_sendto = sendto (fd, audio_buffer , pEnvoye.frequenceEchantillonnage, 0, (struct sockaddr*) &addrClient , tolen) ;
 
             // if (err_sendto == -1 )
             // {
