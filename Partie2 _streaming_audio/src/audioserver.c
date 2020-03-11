@@ -1,21 +1,201 @@
-#include <stdio.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <audio.h>
-#include<sys/socket.h>
-#include<arpa/inet.h>
-#include<netinet/in.h>
-#include<netinet/ip.h>
+//#include <serveur.h>
+
+#include "../include/serveur.h"
+
+//////////////// Variables Globales/////////////
+int tab_clients[CLIENT_MAX][2];
+int sockfd;
+struct  sockaddr_in addrserveur , addrClient  ;
+
+//les packets envoyes et reçu
+struct packet packEnvoye ;
+struct packet packRecu ;
+
+//les info du son 
+
+struct infoSon info_du_fichier_audio;
+
+
+
+
+///////////////////////// creation et suppression de packets////////////////
+static void create_packet(struct packet* pack, int type, void* content){
+    pack->type = type ;
+    memcpy(pack->message, content , BUFFER_SIZE);
+}
+
+static void clear_packet(struct packet* pack){
+    pack->type = VIDE ;
+    bzero(pack->message , BUFFER_SIZE);
+}
+
+
+///////////initialiser une sconnexion ////////////////
+static int init_connexion( struct  sockaddr_in * addrserveur){
+    
+return 1;
+
+}
+
+///////////fermer  une sconnexion ////////////////
+static void fin_connexion(int sockfd){
+    close(sockfd) ;
+}
+
+/////////// envoyer un packet ///////////////////
+static void envoye_packet(int sock, struct  sockaddr_in *addrclient, struct packet *buffer){
+    int bufferSize = sizeof(struct packet);
+    socklen_t flen ;
+    flen = sizeof(struct sockaddr_in);
+   if(sendto(sock, buffer, bufferSize, 0, (struct sockaddr*) addrclient, flen) < 0)
+   {
+      perror("sendto()");
+      exit(errno);
+   }
+}
+
+
+////////////lire un packet//////////////////////////
+static socklen_t lire_packet(int sock, struct  sockaddr_in *addrclient, struct packet *buffer){
+ 
+   int bufferSize = sizeof(struct packet);
+   socklen_t len , flen ;
+    flen = sizeof(struct sockaddr_in);
+
+   if((len = recvfrom(sock, buffer, bufferSize - 1, 0, (struct sockaddr*) addrclient , &flen)) < 0)
+   {
+      perror("recvfrom()");
+     // exit(errno);
+   }
+
+
+   return len;
+}
+
+/////////////ajouter client ////////////////////////////
+static bool add_client( struct packet* pack ){
+
+    for (int i = 0; i < CLIENT_MAX; i++)
+    {
+        if (tab_clients[i][0] == 0)
+        {
+            pack->id_client = i ;
+
+            return true ;
+        }
+        
+    }
+
+    return false;
+    
+} 
+
+
+//////////////////////supprimer client ///////////////
+static void remove_client(int id_client ){
+    tab_clients[id_client][0] =  0 ;
+    //TODO
+}
+
+
+//////AUDIO PATH
+static void audio_path(const char *filename ,  char *audioPath){
+        strcpy( audioPath,AUDIO_DIR);
+            strcat(audioPath , filename);
+}
+
+
+///debut du programme ///////////////
+
+static void init(){
+
+
+
+    sockfd = socket(AF_INET , SOCK_DGRAM , 0);
+    //
+    if (sockfd == SOCKET_ERROR )
+    {
+        perror("socket()");
+        exit(errno);
+    } else puts("oui_socket");
+    //
+    addrserveur.sin_family         = AF_INET ;
+    addrserveur.sin_port           = htons (PORT);
+    addrserveur.sin_addr.s_addr    = htonl (INADDR_ANY);
+
+
+    int  err_bind = bind(sockfd, (struct sockaddr *)&addrserveur , sizeof(addrserveur) );
+            //
+            if (err_bind == -1 )
+            {
+                puts("non_bind");
+            } else puts("oui_bind");
+
+
+    for (size_t i = 0; i < CLIENT_MAX; i++)
+    {
+        tab_clients[i][0] = 0 ;
+        tab_clients[i][1] = 0 ;
+    }
+    
+}
+
+// fin du programme /////
+static void fin(){
+
+    close(sockfd) ;
+
+}
+
+
+/// corp du prog////////////////
+static void app(){
+    while (true)
+    {
+        //***** recvfrome
+        lire_packet(sockfd , &addrClient , &packRecu);
+
+        //******* verification du type de packet
+
+        //*** si filename 
+
+
+
+
+
+
+    }
+    
+
+ 
+
+
+}
+
+
+// int main(int argc, char const *argv[])
+// {
+//     init();
+//     app();
+//     fin();
+//     return 0;
+// }
+
+
+
+
+/*###########################################################################################
+1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+22222222222222222222222222222222222222222222222222222
+999999999999999999999999999999999999999999999999999999999999999999999999999999999
+#####################################################################################"""*/
+
+
+//   /*
 
 #define MAX_FILENAME_SIZE 1024
 ///////////////////////////////////
-struct packet {
+struct packet2 {
     int frequenceEchantillonnage;
     int tailleEchantillonnage;
     int canal;
@@ -45,32 +225,52 @@ int main(int argc, char const *argv[])
     /////////
    // int fd , err ;
 
-    struct  sockaddr_in addrServer , addrClient;
+    // struct  sockaddr_in addrServer , addrClient ,sock2;
 
-       /*Socket*/
-    int fd = socket(AF_INET , SOCK_DGRAM , 0);
-    //
-    if (fd == -1 )
-    {
-        puts("non_socket");
-    } else puts("oui_socket");
-    //
+    //    /*Socket*/
+    // int fd = socket(AF_INET , SOCK_DGRAM , 0);
+    // //
+    // if (fd == -1 )
+    // {
+    //     puts("non_socket");
+    // } else {puts("oui_socket2"); printf("%d \n", fd);}
+    // //
 
-    addrServer.sin_family         = AF_INET ;
-    addrServer.sin_port           = htons (3685);
-    addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
+    // addrServer.sin_family         = AF_INET ;
+    // addrServer.sin_port           = htons (3685);
+    // addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
+
+    // int fd2 = socket(AF_INET , SOCK_DGRAM , 0);
+    // if (fd2 == -1 )
+    // {
+    //     puts("non_socket2");
+    // } else {puts("oui_socket2"); printf("%d \n", fd2);}
+    // //
+
+    // sock2.sin_family         = AF_INET ;
+    // sock2.sin_addr.s_addr    = htonl (INADDR_ANY);
 
     
 
-        /*bind*/
-        int  err_bind = bind(fd, (struct sockaddr *)&addrServer , sizeof(addrServer) );
-            //
-            if (err_bind == -1 )
-            {
-                puts("non_bind");
-            } else puts("oui_bind");
-            //
+    //     /*bind*/
+    //     int  err_bind = bind(fd, (struct sockaddr *)&addrServer , sizeof(addrServer) );
+    //         //
+    //         if (err_bind == -1 )
+    //         {
+    //             puts("non_bind");
+    //         } else puts("oui_bind");
+    //         //
 
+    //         /*bind2*/
+    //     int  err_bind2 = bind(fd2, (struct sockaddr *)&sock2 , sizeof(sock2) );
+    //         //
+    //         if (err_bind2 == -1 )
+    //         {
+    //             puts("non_bind2");
+    //         } else puts("oui_bind2");
+            //
+//
+    init();
             /*recvfrom */
             char messageBuffer [1024];
             int bufferSize = sizeof(messageBuffer);
@@ -79,11 +279,12 @@ int main(int argc, char const *argv[])
             socklen_t len , flen ;
 
     while (true)
-    {
+    { 
+       // usleep(7000000);
         ////////////////////////
-        struct packet pEnvoye ;
+        struct packet2 pEnvoye ;
         flen = sizeof(struct sockaddr_in);
-        len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
+        len = recvfrom(sockfd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
         char * ipaddrcoirant  = inet_ntoa(addrClient.sin_addr);
         int portaddrcoirant  = ntohs(addrClient.sin_port);
         puts(ipaddrcoirant); //// 
@@ -111,9 +312,11 @@ int main(int argc, char const *argv[])
           
             //
         /////////////////////////////////////////////////////////////////////
-        strcpy(caractereSaisie , messageBuffer);
-        strcpy(fileName,audioPath);
-            strcat(fileName , caractereSaisie);
+        // strcpy(caractereSaisie , messageBuffer);
+        // strcpy(fileName,audioPath);
+        //     strcat(fileName , caractereSaisie);
+
+            audio_path(messageBuffer ,fileName);
 
         puts("");
             if (audio_ouvert){
@@ -132,7 +335,7 @@ int main(int argc, char const *argv[])
 
             fprintf(stdout,
             " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
-            caractereSaisie ,
+            messageBuffer ,
             pEnvoye.frequenceEchantillonnage,
             pEnvoye.tailleEchantillonnage,
             pEnvoye.canal);
@@ -147,7 +350,7 @@ int main(int argc, char const *argv[])
         //flags = 0 ;
         socklen_t tolen  = sizeof (struct sockaddr_in);
 
-        err_sendto = sendto (fd, &pEnvoye , sizeof(struct packet), 0, (struct sockaddr*) &addrClient , tolen) ;
+        err_sendto = sendto (sockfd, &pEnvoye , sizeof(struct packet2), 0, (struct sockaddr*) &addrClient , tolen) ;
 
         if (err_sendto == -1 )
         {
@@ -172,7 +375,7 @@ int main(int argc, char const *argv[])
             // sizeMsg = strlen(audio_buffer)+1;
             
             
-            err_sendto = sendto (fd, audio_buffer , pEnvoye.frequenceEchantillonnage, 0, (struct sockaddr*) &addrClient , tolen) ;
+            err_sendto = sendto (sockfd, audio_buffer , pEnvoye.frequenceEchantillonnage, 0, (struct sockaddr*) &addrClient , tolen) ;
 
             // if (err_sendto == -1 )
             // {
@@ -185,12 +388,12 @@ int main(int argc, char const *argv[])
                 fd_set read_set;
                 struct timeval timeout;
                 FD_ZERO(&read_set);
-                FD_SET(fd , &read_set);
+                FD_SET(sockfd , &read_set);
                 timeout.tv_sec = 0 ;
                 timeout.tv_usec = 5000000;
                 
                 
-                int nb1 = select(fd+1 , &read_set , NULL, NULL, &timeout);
+                int nb1 = select(sockfd+1 , &read_set , NULL, NULL, &timeout);
                 
                 if(nb1  < 0){
                     puts("erro_select");
@@ -208,16 +411,16 @@ int main(int argc, char const *argv[])
 
                 }
 
-                if (FD_ISSET (fd , &read_set))
+                if (FD_ISSET (sockfd , &read_set))
                 {
 
                  do
               {
-                 len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
+                 len = recvfrom(sockfd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
                  //////
                  if(strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port) ){
                 strcpy (pEnvoye.msg ,"stop");
-                int err_sendt = sendto (fd, &pEnvoye , sizeof(struct packet), 0, (struct sockaddr*) &addrClient ,sizeof (struct sockaddr_in) ) ;
+                int err_sendt = sendto (sockfd, &pEnvoye , sizeof(struct packet2), 0, (struct sockaddr*) &addrClient ,sizeof (struct sockaddr_in) ) ;
                  }
 
              }while ((strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port)) );
@@ -239,7 +442,7 @@ int main(int argc, char const *argv[])
             {
                 arretDuSon = true ;
                // strcpy(audio_buffer , "fin")
-                err_sendto = sendto (fd, "fin" , 4, 0, (struct sockaddr*) &addrClient , tolen) ;
+                err_sendto = sendto (sockfd, "fin" , 4, 0, (struct sockaddr*) &addrClient , tolen) ;
 
             }
 
@@ -265,7 +468,7 @@ int main(int argc, char const *argv[])
 
 
     /*close*/
-    int fini = close( fd);
+    int fini = close( sockfd);
        if (fini == -1 )
     {
         puts("non_close");
@@ -276,3 +479,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
+
+
+
+// */
