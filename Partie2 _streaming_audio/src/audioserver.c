@@ -80,13 +80,16 @@ int main(int argc, char const *argv[])
 
     while (true)
     {
+        ////////////////////////
         struct packet pEnvoye ;
         flen = sizeof(struct sockaddr_in);
         len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
         char * ipaddrcoirant  = inet_ntoa(addrClient.sin_addr);
         int portaddrcoirant  = ntohs(addrClient.sin_port);
-        puts(ipaddrcoirant);
-        printf("%d\n",portaddrcoirant);
+        puts(ipaddrcoirant); //// 
+        printf("%d\n",portaddrcoirant); ///
+
+        ////////////////////////////////
 
         //
         if (len == -1 )
@@ -133,6 +136,7 @@ int main(int argc, char const *argv[])
             pEnvoye.frequenceEchantillonnage,
             pEnvoye.tailleEchantillonnage,
             pEnvoye.canal);
+            
         //////////////////////////////////////////////////////////////////////
 
         /*sendto*/
@@ -152,10 +156,13 @@ int main(int argc, char const *argv[])
         //
 
 
-        ///////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+
+
          bool arretDuSon = false;
         char audio_buffer[pEnvoye.frequenceEchantillonnage];
        // int  sizeMsg = strlen(audio_buffer)+1;
+       int nb_timeout = 0; 
         ssize_t  readAudio  ;
 
         while (!arretDuSon )
@@ -173,8 +180,39 @@ int main(int argc, char const *argv[])
             // } else puts("oui_sendto");
             bzero(audio_buffer, pEnvoye.frequenceEchantillonnage);
 
-             do
-             {
+/////////////////////////////////////////////////////////////////////
+           
+                fd_set read_set;
+                struct timeval timeout;
+                FD_ZERO(&read_set);
+                FD_SET(fd , &read_set);
+                timeout.tv_sec = 0 ;
+                timeout.tv_usec = 5000000;
+                
+                
+                int nb1 = select(fd+1 , &read_set , NULL, NULL, &timeout);
+                
+                if(nb1  < 0){
+                    puts("erro_select");
+                }
+
+                if (nb1 == 0)
+                {
+                    puts("timeout");
+                    ++nb_timeout ;
+                    if (nb_timeout == 4)
+                    {
+                       arretDuSon = true ; 
+                    }
+                    
+
+                }
+
+                if (FD_ISSET (fd , &read_set))
+                {
+
+                 do
+              {
                  len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
                  //////
                  if(strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port) ){
@@ -182,7 +220,11 @@ int main(int argc, char const *argv[])
                 int err_sendt = sendto (fd, &pEnvoye , sizeof(struct packet), 0, (struct sockaddr*) &addrClient ,sizeof (struct sockaddr_in) ) ;
                  }
 
-             }while (strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port) );
+             }while ((strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port)) );
+                }
+
+//////////////////////////////////////////////////////////
+             
              
              
 
