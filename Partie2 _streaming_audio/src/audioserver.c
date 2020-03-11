@@ -19,6 +19,7 @@ struct packet {
     int frequenceEchantillonnage;
     int tailleEchantillonnage;
     int canal;
+    char  msg [64];
 };
 ///////////////////////////////////////
 
@@ -31,9 +32,9 @@ int main(int argc, char const *argv[])
     char fileName [MAX_FILENAME_SIZE];
     char caractereSaisie [MAX_FILENAME_SIZE];
     char audioPath[] = "audio/" ;
-    int frequenceEchantillonnage ;
-    int tailleEchantillonnage;
-    int canal ;
+    int lecture_audio ;
+    bool audio_ouvert = false ;
+   // bool unClientConnecte = false ;
 
     
     //on range le chemin du fichier dans fileName
@@ -56,29 +57,40 @@ int main(int argc, char const *argv[])
     //
 
     addrServer.sin_family         = AF_INET ;
-    addrServer.sin_port           = htons (8080);
+    addrServer.sin_port           = htons (3685);
     addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
 
-/*bind*/
-   int  err_bind = bind(fd, (struct sockaddr *)&addrServer , sizeof(addrServer) );
-    //
-    if (err_bind == -1 )
-    {
-        puts("non_bind");
-    } else puts("oui_bind");
-    //
-
-    /*recvfrom */
-    char messageBuffer [1024];
-    int bufferSize = sizeof(messageBuffer);
-    // int flags = 0 ;
     
-    socklen_t len , flen ;
+
+        /*bind*/
+        int  err_bind = bind(fd, (struct sockaddr *)&addrServer , sizeof(addrServer) );
+            //
+            if (err_bind == -1 )
+            {
+                puts("non_bind");
+            } else puts("oui_bind");
+            //
+
+            /*recvfrom */
+            char messageBuffer [1024];
+            int bufferSize = sizeof(messageBuffer);
+            // int flags = 0 ;
+            
+            socklen_t len , flen ;
 
     while (true)
     {
+        ////////////////////////
+        struct packet pEnvoye ;
         flen = sizeof(struct sockaddr_in);
         len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
+        char * ipaddrcoirant  = inet_ntoa(addrClient.sin_addr);
+        int portaddrcoirant  = ntohs(addrClient.sin_port);
+        puts(ipaddrcoirant); //// 
+        printf("%d\n",portaddrcoirant); ///
+
+        ////////////////////////////////
+
         //
         if (len == -1 )
         {
@@ -87,38 +99,52 @@ int main(int argc, char const *argv[])
         printf("Received %d bytes from host %s port %d: %s \n", len,
         inet_ntoa(addrClient.sin_addr),
         ntohs(addrClient.sin_port), 
-        messageBuffer);   
-        }
-        //
-/////////////////////////////////////////////////////////////////////
- strcpy(caractereSaisie , messageBuffer);
-strcpy(fileName,audioPath);
-    strcat(fileName , caractereSaisie);
+        messageBuffer);  
+        strcpy (pEnvoye.msg , "connexion");
+       // unClientConnecte = true ;
+        
+            }
 
-puts("");
-    int lecture_audio = aud_readinit(fileName , &frequenceEchantillonnage, &tailleEchantillonnage, &canal);  
-    puts("");
+           // if (unClientConnecte){
+                //
+            //}
+          
+            //
+        /////////////////////////////////////////////////////////////////////
+        strcpy(caractereSaisie , messageBuffer);
+        strcpy(fileName,audioPath);
+            strcat(fileName , caractereSaisie);
 
-    //en cas d'erreur
-    if (lecture_audio == -1 ) return -1 ;
+        puts("");
+            if (audio_ouvert){
+                int fini2 = close(lecture_audio);
+                audio_ouvert = false ;
+               if (fini2 == -1 )
+                {
+                    puts("non_close2");
+                } else puts("oui_close2");
+            }
+             lecture_audio = aud_readinit(fileName , &pEnvoye.frequenceEchantillonnage, &pEnvoye.tailleEchantillonnage, &pEnvoye.canal);  
+            puts("");
 
-    fprintf(stdout,
-    " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
-    caractereSaisie ,
-    frequenceEchantillonnage,
-    tailleEchantillonnage,
-    canal);
-//////////////////////////////////////////////////////////////////////
+            //en cas d'erreur
+            if (lecture_audio == -1 ) return -1 ;
+
+            fprintf(stdout,
+            " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
+            caractereSaisie ,
+            pEnvoye.frequenceEchantillonnage,
+            pEnvoye.tailleEchantillonnage,
+            pEnvoye.canal);
+            
+        //////////////////////////////////////////////////////////////////////
 
         /*sendto*/
-        struct packet pEnvoye ;
+        
         int err_sendto;
         //char  msg [64] = "Hello World ! du server";
         //int  sizeMsg = strlen(msg)+1;
         //flags = 0 ;
-        pEnvoye.canal =canal ;
-        pEnvoye.frequenceEchantillonnage = frequenceEchantillonnage;
-        pEnvoye.tailleEchantillonnage = tailleEchantillonnage ;
         socklen_t tolen  = sizeof (struct sockaddr_in);
 
         err_sendto = sendto (fd, &pEnvoye , sizeof(struct packet), 0, (struct sockaddr*) &addrClient , tolen) ;
@@ -130,10 +156,13 @@ puts("");
         //
 
 
-        ///////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
+
+
          bool arretDuSon = false;
         char audio_buffer[pEnvoye.frequenceEchantillonnage];
        // int  sizeMsg = strlen(audio_buffer)+1;
+       int nb_timeout = 0; 
         ssize_t  readAudio  ;
 
         while (!arretDuSon )
@@ -149,9 +178,56 @@ puts("");
             // {
             //     puts("non_sendto");
             // } else puts("oui_sendto");
-            bzero(audio_buffer, frequenceEchantillonnage);
+            bzero(audio_buffer, pEnvoye.frequenceEchantillonnage);
 
-             len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
+/////////////////////////////////////////////////////////////////////
+           
+                fd_set read_set;
+                struct timeval timeout;
+                FD_ZERO(&read_set);
+                FD_SET(fd , &read_set);
+                timeout.tv_sec = 0 ;
+                timeout.tv_usec = 5000000;
+                
+                
+                int nb1 = select(fd+1 , &read_set , NULL, NULL, &timeout);
+                
+                if(nb1  < 0){
+                    puts("erro_select");
+                }
+
+                if (nb1 == 0)
+                {
+                    puts("timeout");
+                    ++nb_timeout ;
+                    if (nb_timeout == 4)
+                    {
+                       arretDuSon = true ; 
+                    }
+                    
+
+                }
+
+                if (FD_ISSET (fd , &read_set))
+                {
+
+                 do
+              {
+                 len = recvfrom(fd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
+                 //////
+                 if(strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port) ){
+                strcpy (pEnvoye.msg ,"stop");
+                int err_sendt = sendto (fd, &pEnvoye , sizeof(struct packet), 0, (struct sockaddr*) &addrClient ,sizeof (struct sockaddr_in) ) ;
+                 }
+
+             }while ((strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port)) );
+                }
+
+//////////////////////////////////////////////////////////
+             
+             
+             
+
         //
             // if (len == -1 )
             // {
@@ -159,7 +235,7 @@ puts("");
             // } else {puts("oui_recvfrom");
               
             // }
-            if(readAudio != frequenceEchantillonnage) 
+            if(readAudio != pEnvoye.frequenceEchantillonnage) 
             {
                 arretDuSon = true ;
                // strcpy(audio_buffer , "fin")
@@ -177,10 +253,13 @@ puts("");
                if (fini2 == -1 )
                 {
                     puts("non_close1");
-                } else puts("oui_close1");
+                } else {
+                    puts("oui_close1");
+                   audio_ouvert = false ;
+                    }
                 //
 
-}
+    }
 
 
 

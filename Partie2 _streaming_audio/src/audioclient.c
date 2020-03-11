@@ -3,6 +3,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -15,13 +16,16 @@
 
 
 #define MAX_FILENAME_SIZE 1024
-///////////////////////////////////
+/////////////////////////////////// metre la stucture dans un autre fichier h
 struct packet {
     int frequenceEchantillonnage;
     int tailleEchantillonnage;
     int canal;
+    char  msg [64];
 };
 ///////////////////////////////////////
+
+// declarer fonction pour les parametres 
 
 
 int main(int argc, char const *argv[])
@@ -45,21 +49,23 @@ int main(int argc, char const *argv[])
     //
 
     addrServer.sin_family         = AF_INET ;
-    addrServer.sin_port           = htons (8080);
-    addrServer.sin_addr.s_addr    = inet_addr("127.0.0.1");
+    addrServer.sin_port           = htons (3685);
+    addrServer.sin_addr.s_addr    = inet_addr(argv[1]);
+
+
+    ///////////////////////////////////////////////////////
 
   /*sendto*/
    
     int err_sendto;
     char  msg [1024] ;
     ////////////////
-    if (argc <= 1)
-     {   printf("Entrez le ici : ");
-        fgets(msg ,( 1024 / sizeof(char)), stdin);
-        *(msg + strlen(msg)-1) = '\0'; 
+    if (argc <= 2)
+     {   printf("aucun parametre detecté ");
+        exit(1);
     }
     else
-    {strcpy(msg , argv[1]);
+    {strcpy(msg , argv[2]);
     puts(msg);}
     int  sizeMsg = strlen(msg)+1; 
     //flags = 0 ;
@@ -71,7 +77,8 @@ int main(int argc, char const *argv[])
     {
         puts("non_sendto");
     } else puts("oui_sendto");
-    //
+
+    ////////////////////////////////////////////////////////////////////////////////////
 
     /*recvfrom */
     //char messageBuffer [64];
@@ -86,12 +93,20 @@ int main(int argc, char const *argv[])
     {
         puts("non_recvfrom");
     } else {puts("oui_recvfrom");
-    printf("Received %d bytes from host %s port %d: %d , %d , %d  \n", len,
+    printf("Received %d bytes from host %s port %d: %d , %d , %d  %s \n", len,
     inet_ntoa(addrServer.sin_addr),
      ntohs(addrServer.sin_port), 
-     pRecu.frequenceEchantillonnage, pRecu.tailleEchantillonnage , pRecu.canal);   
+     pRecu.frequenceEchantillonnage, pRecu.tailleEchantillonnage ,pRecu.canal , pRecu.msg);   
     }
-    //
+
+    if (strcmp(pRecu.msg , "stop") == 0)
+    {
+        puts("stoppppppppppp");
+        exit(1);
+    }
+    
+    ////////////////////////////////////////////////////////////////////////////////////////
+    
     puts("");
      int ecriture_audio = aud_writeinit(pRecu.frequenceEchantillonnage , pRecu.tailleEchantillonnage , pRecu.canal);
     puts("");
@@ -101,12 +116,14 @@ int main(int argc, char const *argv[])
     ssize_t  writeAudio ;
     char audio_buffer[pRecu.frequenceEchantillonnage];
     int  sizeMsg2 = strlen(audio_buffer)+1;
+
+    /////////////////////////////////////////////////////////////////////////////////////////
     
 
     while (!arretDuSon )
     {
       
-       
+     
        
        len = recvfrom(fd , audio_buffer , sizeof(audio_buffer), 0 , (struct sockaddr*) &addrServer , &flen);
         sizeMsg2 = strlen(audio_buffer)+1;
