@@ -1,21 +1,46 @@
 //#include <serveur.h>
 
 #include "../include/serveur.h"
+#include "../include/listclient.h"
 
-//////////////// Variables Globales/////////////
-int tab_clients[CLIENT_MAX][2];
-int sockfd;
+////////////////////// Variables Globales/////////////////////////////////////////////
+
+int sockfd , fdMax = 0;
+
+struct  client listClient [CLIENT_MAX];
+
+////audio dir
+char audioPath[BUFFER_SIZE];
+
+//msgBuffer
+char msgBuffer[BUFFER_SIZE];
+ssize_t  readAudio ;
+
+///utilisation temp des sockfd pour les fils
+int sd ; 
+
+//////// pour gerer les recvfrom
+socklen_t recvfd;
+
+//descripteur de fichier audio 
+
+int lecture_audio ;
+
 struct  sockaddr_in addrserveur , addrClient  ;
+
+//timeout
+fd_set read_set;
+struct timeval timeout;
 
 //les packets envoyes et reçu
 struct packet packEnvoye ;
 struct packet packRecu ;
 
-//les info du son 
 
-struct infoSon info_du_fichier_audio;
+/// MSG ERRERU
+int err_connexion;
 
-
+/////////////////////////////////////////////////////////////////////////////////////////
 
 
 ///////////////////////// creation et suppression de packets////////////////
@@ -26,20 +51,56 @@ static void create_packet(struct packet* pack, int type, void* content){
 
 static void clear_packet(struct packet* pack){
     pack->type = VIDE ;
-    bzero(pack->message , BUFFER_SIZE);
+    pack->id_client = CLIENT_MAX ;
+    bzero(pack, sizeof (struct packet) );
+}
+
+static void copy_packet(struct packet* pack2 , struct packet* pack1){
+    clear_packet(pack2);
+    pack2->id_client = pack1->id_client;
+    pack2->type = pack1->type;
+    memcpy(pack2->message , pack1->message  , BUFFER_SIZE );
 }
 
 
 ///////////initialiser une sconnexion ////////////////
-static int init_connexion( struct  sockaddr_in * addrserveur){
-    
-return 1;
+static int init_connexion(int id_client ){
+    struct  sockaddr_in socket2 ;
+   int  newsocket = socket(AF_INET , SOCK_DGRAM , 0);
+    //
+    if (newsocket == SOCKET_ERROR )
+    {
+        perror("socket()");
+        err_connexion = MSG_ERREUR_SOCKET ; 
+        return -1;
+    } 
+    socket2.sin_family         = AF_INET ;
+    socket2.sin_addr.s_addr    = htonl (INADDR_ANY);
+
+
+    int  err_bind = bind(newsocket, (struct sockaddr *)&socket2 , sizeof(socket2) );
+            //
+            if (err_bind < 0 )
+            {
+                err_connexion = MSG_ERREUR_PORT; 
+                return -1;
+            }
+
+    // ajouter le client dans le tableau
+    listClient[id_client].s_fd = newsocket ;
+    fdMax = (newsocket > fdMax) ? newsocket : fdMax ;
+    // FD_SET(newsocket , &read_set);
+    clear_packet(&listClient[id_client].data);
+
+return newsocket;
 
 }
 
 ///////////fermer  une sconnexion ////////////////
-static void fin_connexion(int sockfd){
-    close(sockfd) ;
+static void fin_connexion(int rmfd){
+   // FD_CLR(rmfd, &read_set);
+    close(rmfd) ;
+
 }
 
 /////////// envoyer un packet ///////////////////
@@ -50,7 +111,7 @@ static void envoye_packet(int sock, struct  sockaddr_in *addrclient, struct pack
    if(sendto(sock, buffer, bufferSize, 0, (struct sockaddr*) addrclient, flen) < 0)
    {
       perror("sendto()");
-      exit(errno);
+      //exit(errno);
    }
 }
 
@@ -60,14 +121,14 @@ static socklen_t lire_packet(int sock, struct  sockaddr_in *addrclient, struct p
  
    int bufferSize = sizeof(struct packet);
    socklen_t len , flen ;
+   len = 0 ;
     flen = sizeof(struct sockaddr_in);
 
-   if((len = recvfrom(sock, buffer, bufferSize - 1, 0, (struct sockaddr*) addrclient , &flen)) < 0)
+   if((len = recvfrom(sock, buffer, bufferSize , 0, (struct sockaddr*) addrclient , &flen)) < 0)
    {
       perror("recvfrom()");
      // exit(errno);
    }
-
 
    return len;
 }
@@ -77,15 +138,23 @@ static bool add_client( struct packet* pack ){
 
     for (int i = 0; i < CLIENT_MAX; i++)
     {
-        if (tab_clients[i][0] == 0)
+        if (listClient[i].est_disponible)
         {
             pack->id_client = i ;
 
+            if (init_connexion( i) < 0)
+            {  
+                return false ;
+            }
+            listClient[i].est_disponible =false ;
+            listClient[i].address = addrClient;
+            listClient[i].data.id_client = i ;
+             
             return true ;
         }
         
     }
-
+    err_connexion = MSG_ERREUR_SERVEUR_COMPLET ;
     return false;
     
 } 
@@ -93,8 +162,17 @@ static bool add_client( struct packet* pack ){
 
 //////////////////////supprimer client ///////////////
 static void remove_client(int id_client ){
-    tab_clients[id_client][0] =  0 ;
-    //TODO
+    int fdtemp = listClient[id_client].s_fd;
+    fin_connexion(listClient[id_client].s_fd);
+    listClient[id_client].s_fd = 0;
+    listClient[id_client].audio_fd =  0 ;
+    listClient[id_client].delait_attente = 0;
+    listClient[id_client].delait_renvoie_de_trame = 0 ;
+    listClient[id_client].est_disponible = true ;
+    listClient[id_client].frequenceEchantillonnage  =  0 ;
+    listClient[id_client].en_lecture = false ;
+    bzero(listClient[id_client].titre_son , BUFFER_SIZE);
+    fdMax = (fdtemp == fdMax) ? calcul_fdMax (sockfd , fdMax) : fdMax ;
 }
 
 
@@ -105,20 +183,44 @@ static void audio_path(const char *filename ,  char *audioPath){
 }
 
 
+///calcule de fdMax
+static int calcul_fdMax(int sfd , int fdmax){
+    fdmax = sfd;
+    for (int i = 0; i < CLIENT_MAX; i++)
+    {
+        if(listClient[i].s_fd > fdmax){
+            fdmax = listClient[i].s_fd ;
+        }
+    } 
+    return fdmax ;
+}
+
+//FD_SET///
+static void fdSet(){
+    FD_SET(sockfd , &read_set);
+    for (int i = 0; i < CLIENT_MAX; i++)
+    {   
+        int sd = listClient[i].s_fd ;
+        if ( sd > 0)
+        {
+             FD_SET(sd , &read_set);
+        }
+        
+    }
+    
+
+}
+
 ///debut du programme ///////////////
 
 static void init(){
-
-
 
     sockfd = socket(AF_INET , SOCK_DGRAM , 0);
     //
     if (sockfd == SOCKET_ERROR )
     {
-        perror("socket()");
         exit(errno);
-    } else puts("oui_socket");
-    //
+    }
     addrserveur.sin_family         = AF_INET ;
     addrserveur.sin_port           = htons (PORT);
     addrserveur.sin_addr.s_addr    = htonl (INADDR_ANY);
@@ -129,15 +231,234 @@ static void init(){
             if (err_bind == -1 )
             {
                 puts("non_bind");
-            } else puts("oui_bind");
+            }
+    fdMax = sockfd ;
 
-
-    for (size_t i = 0; i < CLIENT_MAX; i++)
+//initialisation de tous les client disponibles
+    for (int i = 0; i < CLIENT_MAX; i++)
     {
-        tab_clients[i][0] = 0 ;
-        tab_clients[i][1] = 0 ;
+        listClient[i].s_fd = 0 ;
+        listClient[i].audio_fd = 0 ;
+        listClient[i].delait_attente = 0;
+        listClient[i].delait_renvoie_de_trame = 0 ;
+        listClient[i].est_disponible = true ;
+        listClient[i].en_lecture = false ;
+        bzero(listClient[i].titre_son , BUFFER_SIZE);
+
     }
+
+    clear_packet(&packEnvoye);
+    clear_packet(&packRecu);
     
+}
+
+/// corp du prog////////////////
+static void app(){
+    while (true)
+    {
+        FD_ZERO(&read_set);
+        fdSet() ;
+        timeout.tv_sec = 0 ;
+        timeout.tv_usec = TIMEOUT;
+
+
+        usleep(5000);// pour gerer les pertes individuellement
+        int activity = select(fdMax+1 , &read_set , NULL, NULL, &timeout);
+        if (activity < 0)
+        {
+            perror("select()");
+            //exit(errno);
+        }
+
+        if (activity == 0)
+        {
+            //time out 
+            puts("timeout"); //TODO: a retirer
+                for (int i = 0; i < CLIENT_MAX; i++) // un client deja co envoie un acquittement
+            {
+                sd = listClient[i].s_fd ;
+                if( sd > 0 )
+                {
+                    listClient[i].delait_attente ++ ;
+                    listClient[i].delait_renvoie_de_trame = 0 ;
+                    envoye_packet(sd , &listClient[i].address, &listClient[i].data);
+                }
+            }
+        }
+
+        if (FD_ISSET(sockfd,&read_set)) //premiere connexion du client
+        {
+            sd = sockfd ;
+            /* code */
+                //***** recvfrome
+           recvfd = lire_packet(sd , &addrClient , &packRecu);
+           if (recvfd <= 0)
+           {
+               perror("recvfrom()");
+           }
+
+            //******* verification du type de packet nom de fichier
+            if (packRecu.type != FILENAME)
+            {
+                create_packet(&packEnvoye , MSG_ERREUR_CO_NON_AUTORISE, AUCUN_MSG);
+            }
+            else ///le bon cas 
+            {
+                struct headerSon headerMusic ;
+                audio_path(packRecu.message, audioPath );
+                lecture_audio = aud_readinit(audioPath ,
+                 &headerMusic.frequenceEchantillonnage,
+                 &headerMusic.tailleEchantillonnage,
+                 &headerMusic.canal);
+                if (lecture_audio < 0) // tous les son du serveur etants compatible, la seule erreur est pour fichier introuve
+                {
+                    /* son indisponible */
+                    create_packet(&packEnvoye , MSG_ERREUR_SON_INDISPONIBLE, AUCUN_MSG );
+                }else
+                {
+                    if (add_client(&packEnvoye))
+                    {
+                        // fprintf(stdout,
+                        //             " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
+                        //             packRecu.message ,
+                        //             headerMusic.frequenceEchantillonnage,
+                        //             headerMusic.tailleEchantillonnage,
+                        //             headerMusic.canal);
+
+                        sd = listClient[packEnvoye.id_client].s_fd;
+                        listClient[packEnvoye.id_client].audio_fd = lecture_audio ;
+                        snprintf(msgBuffer, sizeof(msgBuffer),
+                          "%d %d %d",
+                          headerMusic.frequenceEchantillonnage,
+                          headerMusic.tailleEchantillonnage, 
+                          headerMusic.canal);
+
+                        create_packet(&packEnvoye , FILE_HEADER, msgBuffer);
+                        strncpy(listClient[packEnvoye.id_client].titre_son, packRecu.message, strlen(packRecu.message) -4 );
+
+                    }else
+                    {
+                        create_packet(&packEnvoye , err_connexion, AUCUN_MSG);
+                    }
+                }
+            }
+            envoye_packet(sd , &addrClient, &packEnvoye);
+            clear_packet(&packEnvoye);
+            clear_packet(&packRecu);
+            bzero(msgBuffer , sizeof(msgBuffer));
+
+        }
+
+        ////le cas ou le client est deja connecté au serveur
+
+        for (int i = 0; i < CLIENT_MAX; i++) // un client deja co envoie un acquittement
+        {
+            sd = listClient[i].s_fd;
+            addrClient = listClient[i].address;
+            lecture_audio = listClient[i].audio_fd ;
+
+            if (listClient[i].en_lecture)
+            {
+                copy_packet(&packEnvoye , &listClient[i].data);
+            }
+            
+
+            if(sd > 0 )
+            {
+                if (FD_ISSET(sd , &read_set))
+                {   
+                    listClient[i].delait_renvoie_de_trame = 0 ;
+                    listClient[i].delait_attente= 0 ;
+
+                    clear_packet(&listClient[i].data);
+                    //***** recvfrome
+                    recvfd = lire_packet(sd , &listClient[i].address , &packRecu);
+                    if (recvfd <= 0)
+                    {
+                        perror("recvfrom()"); 
+                    }
+                     
+                    //les actions en fonction du type de message 
+                    switch (packRecu.type)
+                    {
+                        case HEADER_MUSIC_RECU:
+                            bzero(msgBuffer, BUFFER_SIZE);
+                        if(read (lecture_audio ,msgBuffer ,BUFFER_SIZE) < 0){
+                                create_packet(&packEnvoye , MSG_ERREUR_LECTURE_AUDIO, AUCUN_MSG);
+                        }
+                            else {
+                                create_packet(&packEnvoye , ECHANTILLON, msgBuffer);
+                                copy_packet(&listClient[i].data , &packEnvoye);
+                                listClient[i].en_lecture = true;
+                                printf("+ Le client : %d  joue le son : %s.\n" , i+1,
+                                listClient[i].titre_son );
+                                puts("-------------------------------------"  );
+
+                                
+                            }
+
+                            break;
+
+                        case ACQUITTEMENT:
+                            bzero(msgBuffer, sizeof(msgBuffer));
+                            readAudio = read (lecture_audio ,msgBuffer ,BUFFER_SIZE);
+                        if(readAudio < 0){
+                                create_packet(&packEnvoye , MSG_ERREUR_LECTURE_AUDIO, AUCUN_MSG);
+                        }
+                        else
+                        {
+                            if(readAudio != BUFFER_SIZE){
+                                create_packet(&packEnvoye , FIN_DU_SON, AUCUN_MSG);
+                                listClient[i].en_lecture = false;
+                            }
+                            else
+                            { 
+                                create_packet(&packEnvoye , ECHANTILLON, msgBuffer);
+                                copy_packet(&listClient[i].data , &packEnvoye);
+                            }
+                        }
+                        
+                            break;
+                        
+                        default:
+                            create_packet(&packEnvoye , MSG_ERREUR_CO_NON_AUTORISE, AUCUN_MSG);
+                            break;
+                    }
+                    envoye_packet(sd , &addrClient, &packEnvoye);
+                    if (packEnvoye.type == FIN_DU_SON )
+                    {
+                        remove_client(i);
+                        printf("- Le client : %d  a fini sa lecture.\n" , i+1 );
+                        puts("-------------------------------------"  );
+                    }
+                    
+                    bzero(msgBuffer , BUFFER_SIZE);
+                    clear_packet(&packEnvoye);
+                    clear_packet(&packRecu);
+                    
+                } else
+                {
+                    listClient[i].delait_renvoie_de_trame ++ ;
+                    if ( listClient[i].delait_renvoie_de_trame >= 1000)
+                    {
+                        envoye_packet(sd , &addrClient, &packEnvoye);
+                        listClient[i].delait_attente ++;
+                        clear_packet(&packEnvoye);
+                        clear_packet(&packRecu);
+                    }
+                }
+                if (listClient[i].delait_attente >= 12)
+                    {
+                        remove_client(i);
+                        printf("# Le client : %d  s'est déconnecte !\n" , i+1 );
+                        puts("-------------------------------------"  );
+                    }
+            }
+            
+        }
+        
+    }
+
 }
 
 // fin du programme /////
@@ -148,338 +469,11 @@ static void fin(){
 }
 
 
-/// corp du prog////////////////
-static void app(){
-    while (true)
-    {
-        //***** recvfrome
-        lire_packet(sockfd , &addrClient , &packRecu);
-
-        //******* verification du type de packet
-
-        //*** si filename 
-
-
-
-            
-
-
-    }
-    
-
- 
-
-
-}
-
-
-// int main(int argc, char const *argv[])
-// {
-//     init();
-//     app();
-//     fin();
-//     return 0;
-// }
-
-
-
-
-/*###########################################################################################
-1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-22222222222222222222222222222222222222222222222222222
-999999999999999999999999999999999999999999999999999999999999999999999999999999999
-#####################################################################################"""*/
-
-
-//   /*
-
-#define MAX_FILENAME_SIZE 1024
-///////////////////////////////////
-struct packet2 {
-    int frequenceEchantillonnage;
-    int tailleEchantillonnage;
-    int canal;
-    char  msg [64];
-};
-///////////////////////////////////////
-
-
 int main(int argc, char const *argv[])
-
 {
-
-       // int fd , err ;
-    char fileName [MAX_FILENAME_SIZE];
-    char caractereSaisie [MAX_FILENAME_SIZE];
-    char audioPath[] = "audio/" ;
-    int lecture_audio ;
-    bool audio_ouvert = false ;
-   // bool unClientConnecte = false ;
-
-    
-    //on range le chemin du fichier dans fileName
-
-    
-    
-
-    /////////
-   // int fd , err ;
-
-    // struct  sockaddr_in addrServer , addrClient ,sock2;
-
-    //    /*Socket*/
-    // int fd = socket(AF_INET , SOCK_DGRAM , 0);
-    // //
-    // if (fd == -1 )
-    // {
-    //     puts("non_socket");
-    // } else {puts("oui_socket2"); printf("%d \n", fd);}
-    // //
-
-    // addrServer.sin_family         = AF_INET ;
-    // addrServer.sin_port           = htons (3685);
-    // addrServer.sin_addr.s_addr    = htonl (INADDR_ANY);
-
-    // int fd2 = socket(AF_INET , SOCK_DGRAM , 0);
-    // if (fd2 == -1 )
-    // {
-    //     puts("non_socket2");
-    // } else {puts("oui_socket2"); printf("%d \n", fd2);}
-    // //
-
-    // sock2.sin_family         = AF_INET ;
-    // sock2.sin_addr.s_addr    = htonl (INADDR_ANY);
-
-    
-
-    //     /*bind*/
-    //     int  err_bind = bind(fd, (struct sockaddr *)&addrServer , sizeof(addrServer) );
-    //         //
-    //         if (err_bind == -1 )
-    //         {
-    //             puts("non_bind");
-    //         } else puts("oui_bind");
-    //         //
-
-    //         /*bind2*/
-    //     int  err_bind2 = bind(fd2, (struct sockaddr *)&sock2 , sizeof(sock2) );
-    //         //
-    //         if (err_bind2 == -1 )
-    //         {
-    //             puts("non_bind2");
-    //         } else puts("oui_bind2");
-            //
-//
     init();
-            /*recvfrom */
-            char messageBuffer [1024];
-            int bufferSize = sizeof(messageBuffer);
-            // int flags = 0 ;
-            
-            socklen_t len , flen ;
-
-    while (true)
-    { 
-       // usleep(7000000);
-        ////////////////////////
-        struct packet2 pEnvoye ;
-        flen = sizeof(struct sockaddr_in);
-        len = recvfrom(sockfd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
-        char * ipaddrcoirant  = inet_ntoa(addrClient.sin_addr);
-        int portaddrcoirant  = ntohs(addrClient.sin_port);
-        puts(ipaddrcoirant); //// 
-        printf("%d\n",portaddrcoirant); ///
-
-        ////////////////////////////////
-
-        //
-        if (len == -1 )
-        {
-            puts("non_recvfrom");
-        } else {puts("oui_recvfrom");
-        printf("Received %d bytes from host %s port %d: %s \n", len,
-        inet_ntoa(addrClient.sin_addr),
-        ntohs(addrClient.sin_port), 
-        messageBuffer);  
-        strcpy (pEnvoye.msg , "connexion");
-       // unClientConnecte = true ;
-        
-            }
-
-           // if (unClientConnecte){
-                //
-            //}
-          
-            //
-        /////////////////////////////////////////////////////////////////////
-        // strcpy(caractereSaisie , messageBuffer);
-        // strcpy(fileName,audioPath);
-        //     strcat(fileName , caractereSaisie);
-
-            audio_path(messageBuffer ,fileName);
-
-        puts("");
-            if (audio_ouvert){
-                int fini2 = close(lecture_audio);
-                audio_ouvert = false ;
-               if (fini2 == -1 )
-                {
-                    puts("non_close2");
-                } else puts("oui_close2");
-            }
-             lecture_audio = aud_readinit(fileName , &pEnvoye.frequenceEchantillonnage, &pEnvoye.tailleEchantillonnage, &pEnvoye.canal);  
-            puts("");
-
-            //en cas d'erreur
-            if (lecture_audio == -1 ) return -1 ;
-
-            fprintf(stdout,
-            " Fichier audio : %s \n Frequence echantillonnage : %d \n Taille echantillonnage : %d \n Canal : %d \n", 
-            messageBuffer ,
-            pEnvoye.frequenceEchantillonnage,
-            pEnvoye.tailleEchantillonnage,
-            pEnvoye.canal);
-            
-        //////////////////////////////////////////////////////////////////////
-
-        /*sendto*/
-        
-        int err_sendto;
-        //char  msg [64] = "Hello World ! du server";
-        //int  sizeMsg = strlen(msg)+1;
-        //flags = 0 ;
-        socklen_t tolen  = sizeof (struct sockaddr_in);
-
-        err_sendto = sendto (sockfd, &pEnvoye , sizeof(struct packet2), 0, (struct sockaddr*) &addrClient , tolen) ;
-
-        if (err_sendto == -1 )
-        {
-            puts("non_sendto");
-        } else puts("oui_sendto");
-        //
-
-
-        /////////////////////////////////////////////////////////////////////
-
-
-         bool arretDuSon = false;
-        char audio_buffer[pEnvoye.frequenceEchantillonnage];
-       // int  sizeMsg = strlen(audio_buffer)+1;
-       int nb_timeout = 0; 
-        ssize_t  readAudio  ;
-
-        while (!arretDuSon )
-        {
-            //lecture des echantillons dans audio_buffer à partir du descripteur de fichier (fd)
-            readAudio = read (lecture_audio ,audio_buffer ,pEnvoye.frequenceEchantillonnage);
-            // sizeMsg = strlen(audio_buffer)+1;
-            
-            
-            err_sendto = sendto (sockfd, audio_buffer , pEnvoye.frequenceEchantillonnage, 0, (struct sockaddr*) &addrClient , tolen) ;
-
-            // if (err_sendto == -1 )
-            // {
-            //     puts("non_sendto");
-            // } else puts("oui_sendto");
-            bzero(audio_buffer, pEnvoye.frequenceEchantillonnage);
-
-/////////////////////////////////////////////////////////////////////
-           
-                fd_set read_set;
-                struct timeval timeout;
-                FD_ZERO(&read_set);
-                FD_SET(sockfd , &read_set);
-                timeout.tv_sec = 0 ;
-                timeout.tv_usec = 5000000;
-                
-                
-                int nb1 = select(sockfd+1 , &read_set , NULL, NULL, &timeout);
-                
-                if(nb1  < 0){
-                    puts("erro_select");
-                }
-
-                if (nb1 == 0)
-                {
-                    puts("timeout");
-                    ++nb_timeout ;
-                    if (nb_timeout == 4)
-                    {
-                       arretDuSon = true ; 
-                    }
-                    
-
-                }
-
-                if (FD_ISSET (sockfd , &read_set))
-                {
-
-                 do
-              {
-                 len = recvfrom(sockfd , messageBuffer , bufferSize, 0 , (struct sockaddr*) &addrClient , &flen);
-                 //////
-                 if(strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port) ){
-                strcpy (pEnvoye.msg ,"stop");
-                int err_sendt = sendto (sockfd, &pEnvoye , sizeof(struct packet2), 0, (struct sockaddr*) &addrClient ,sizeof (struct sockaddr_in) ) ;
-                 }
-
-             }while ((strcmp(ipaddrcoirant,inet_ntoa(addrClient.sin_addr) ) != 0 || portaddrcoirant != ntohs(addrClient.sin_port)) );
-                }
-
-//////////////////////////////////////////////////////////
-             
-             
-             
-
-        //
-            // if (len == -1 )
-            // {
-            //     puts("non_recvfrom");
-            // } else {puts("oui_recvfrom");
-              
-            // }
-            if(readAudio != pEnvoye.frequenceEchantillonnage) 
-            {
-                arretDuSon = true ;
-               // strcpy(audio_buffer , "fin")
-                err_sendto = sendto (sockfd, "fin" , 4, 0, (struct sockaddr*) &addrClient , tolen) ;
-
-            }
-
-
-            // vider le buffer apres chaque passage.
-            //bzero(audio_buffer, frequenceEchantillonnage);
-
-        }
-
-           int fini2 = close(lecture_audio);
-               if (fini2 == -1 )
-                {
-                    puts("non_close1");
-                } else {
-                    puts("oui_close1");
-                   audio_ouvert = false ;
-                    }
-                //
-
-    }
-
-
-
-
-    /*close*/
-    int fini = close( sockfd);
-       if (fini == -1 )
-    {
-        puts("non_close");
-    } else puts("oui_close");
-    //
-
-
+    app();
+    fin();
     return 0;
 }
 
-
-
-
-// */

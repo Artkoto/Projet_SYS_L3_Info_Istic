@@ -1,3 +1,6 @@
+#ifndef CLIENT_H_
+#define CLIENT_H_
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -17,53 +20,40 @@
 #define PORT 8586
 
 #define SOCKET_ERROR -1
+#define AUCUN_MSG ""
 
 
 // Timeouts
-#define TIMEOUT 5000000  // 5 seconds
+#define TIMEOUT 60000000  // 1 min
 
 // Message types
 #define VIDE 0 
 #define FILENAME 1 // nom de fichier
-#define INFOSON  2 // information du son 
+#define FILE_HEADER  2 // information du son 
 #define ECHANTILLON  3 // echantillons
 #define ACQUITTEMENT  4 // acquitement
 #define MSG_ERREUR_SERVEUR_COMPLET   5 //message d'erreur
+#define MSG_ERREUR_SON_INDISPONIBLE  6
 #define MSG_ERREUR_CO_NON_AUTORISE  7
-#define FIN_DU_SON 8
+#define MSG_ERREUR_LECTURE_AUDIO 8
+#define MSG_ERREUR_SOCKET  9
+#define MSG_ERREUR_PORT  10
+#define FIN_DU_SON 11
+#define HEADER_MUSIC_RECU 12
 
 // Structures
 
-typedef struct infoSon {
+typedef struct headerSon {
 	int frequenceEchantillonnage;
     int tailleEchantillonnage;
     int canal;
-} infoSon;
+} headerSon;
 
-// typedef struct echantillon {
-//     const int type = ECHANTILLON;
-// 	char race[BUFFER_SIZE;]
-// } echantillon;
-
-// typedef struct filename {
-//     const int  type = FILENAME;
-// 	char name[BUFFER_SIZE;]
-// } filename;
-
-// typedef struct acquittement {
-//     const int type = ACQUITTEMENT;
-// 	char acquit[BUFFER_SIZE;]
-// } acquittement;
-
-// typedef struct meassageErr {
-//     const int type = MSG_ERREUR;
-// 	char err[BUFFER_SIZE;]
-// } meassageErr;
 
 typedef struct packet {
 	int type;
 	int id_client;
-	void *message;
+	char message[BUFFER_SIZE];
 } packet;
 
 
@@ -73,9 +63,11 @@ typedef struct packet {
 // signatures des Methodes
 static void init();
 static void app(/*const char *address , const char *name*/);
-static void fin(int socket);
+static void fin();
 
 static void param(int argc, char const *argv[]);
+static void recup_audio_header( char *header);
+
 
 static void create_packet(struct packet* pack, int type, void* content);
 static void clear_packet(struct packet* pack);
@@ -87,9 +79,5 @@ static socklen_t lire_packet(int sock, struct  sockaddr_in *addrserveur, struct 
 
 
 
-
-
-
-
-
+#endif /**/
 
