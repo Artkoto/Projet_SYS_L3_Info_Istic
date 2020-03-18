@@ -58,7 +58,7 @@ typedef struct headerSon {
 	int frequenceEchantillonnage;
     int tailleEchantillonnage;
     int canal;
-} headerSon;
+} headerSon; //entete d'un fichier audio
 
 
 typedef struct packet {
@@ -88,7 +88,7 @@ static void envoye_packet(int sock, struct  sockaddr_in *addrclient, struct pack
 static socklen_t lire_packet(int sock, struct  sockaddr_in *addrclient, struct packet *buffer);
 
 static bool add_client( struct packet* pack ); //on attribut un id au client 
-static void remove_client(int id_client ); //
+static void remove_client(int id_client ); 
 
 static int calcul_fdMax(int sfd , int fdmax);
 
@@ -98,4 +98,4 @@ static void audio_path(const char *filename ,  char *audioPath);
 
 
 
-#endif /**/
+#endif /*SERVEUR_H_*/

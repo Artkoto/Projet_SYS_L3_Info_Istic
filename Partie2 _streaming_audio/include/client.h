@@ -62,7 +62,7 @@ typedef struct packet {
 
 // signatures des Methodes
 static void init();
-static void app(/*const char *address , const char *name*/);
+static void app();
 static void fin();
 
 static void param(int argc, char const *argv[]);
@@ -79,5 +79,5 @@ static socklen_t lire_packet(int sock, struct  sockaddr_in *addrserveur, struct 
 
 
 
-#endif /**/
+#endif /*CLIENT_H_*/
 

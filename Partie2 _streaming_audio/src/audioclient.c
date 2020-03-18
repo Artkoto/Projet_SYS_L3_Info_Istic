@@ -1,28 +1,28 @@
-//#include <client.h>
-#include "../include/client.h"
+#include <client.h>
 
-////////////////////// Variables Globales/////////////////////////////////////////////
+                        /* ##################################################
+                           #            Les variables globales              #
+                           ##################################################
+                        */
 ////sockfd
 int sockfd  = 0;
 
 
-//ifon du client 
+//id du client dans le serveur
 int id = 0 ; 
 
 ////audio dir
-// char msgBuffer[BUFFER_SIZE];
+// char msgBuffer[BUFFER_SIZE]; 
 char filename [BUFFER_SIZE];
 char address[BUFFER_SIZE];
 
-///utilisation temp des sockfd pour les fils
- bool en_ligne = false; 
+ bool en_ligne = false; // pour verifier si l'utilisateur est connecter au serveur
 
-//////// por gerer les recvfrom
+//////// pour gerer les receptions de trames 
 socklen_t recvfd;
 
 //descripteur de fichier audio 
-
-int ecriture_audio ;
+int ecriture_audio  = 0;
 
 struct  sockaddr_in addrserveur ;
 
@@ -38,12 +38,15 @@ struct packet packRecu ;
 
 struct headerSon audio_header;
 
-/// MSG ERRERU
+/// MSG ERRUR
 int err_connexion;
 
-/////////////////////////////////////////////////////////////////////////////////////////
 
-///////////////////// param//////////////////////////////////
+                    /* ##################################################
+                        #           Les methodes de l'application        #
+                        ##################################################
+                    */
+///////////////////// parametres //////////////////////////////////
 static void param (int argc, char const *argv[]){
     // verifier les parametres 
 	if ((argv[1] == NULL) || (argv[2] == NULL) || (argc != 3) ) {
@@ -54,7 +57,7 @@ static void param (int argc, char const *argv[]){
     strcpy(address , argv[1]);
     strcpy(filename , argv[2]);
 }
-//////////////////////recuperatiion des parametres audios///////////////////
+////////////////////// recuperatiion des l'entete de l' audios ///////////////////
 
 static void recup_audio_header( char *header){
     char *token = strtok(header, " ");
@@ -93,11 +96,11 @@ static void create_packet(struct packet* pack, int type, void* content){
 
 static void clear_packet(struct packet* pack){
     pack->type = VIDE ;
-    bzero(pack, sizeof (struct packet) );
+    bzero(pack->message, BUFFER_SIZE);
 }
 
 
-///////////initialiser une sconnexion ////////////////
+/////////// initialiser une sconnexion ////////////////
 static int init_connexion(const char *address, struct  sockaddr_in * addrserveur){
     sockfd = socket(AF_INET , SOCK_DGRAM , 0); 
     // 
@@ -133,7 +136,7 @@ static void envoye_packet(int sock, struct  sockaddr_in *addrclient, struct pack
 }
 
 
-////////////lire un packet//////////////////////////
+////////////    lire un packet      //////////////////////////
 static socklen_t lire_packet(int sock, struct  sockaddr_in *addrserveur, struct packet *buffer){
  
    int bufferSize = sizeof(struct packet);
@@ -143,15 +146,11 @@ static socklen_t lire_packet(int sock, struct  sockaddr_in *addrserveur, struct 
    if((len = recvfrom(sock, buffer, bufferSize , 0, (struct sockaddr*) addrserveur , &flen)) < 0)
    {
       perror("recvfrom()");
-     // exit(errno);
    }
-
-//    buffer[n] = 0;
-
    return len;
 }
 
-///debut du programme ///////////////
+///     debut du programme  ///////////////
 static void init(){
     
     clear_packet(&packEnvoye);
@@ -163,40 +162,41 @@ static void init(){
     }
     en_ligne = true ;
     create_packet(&packEnvoye , FILENAME ,filename);
-    envoye_packet(sockfd , &addrserveur , &packEnvoye);
+    envoye_packet(sockfd , &addrserveur , &packEnvoye); // envoie du premier packet (filename)
     clear_packet(&packEnvoye);
  
 }
 
-
-
-/// corp du prog////////////////
+///  corp du programme    //////////////
 static void app(){
 
-    while (en_ligne)
+    while (en_ligne)  // tant que l'utilisateur est connecte au serveur
     {
         FD_ZERO(&read_set);
-         FD_SET(sockfd , &read_set);
+        FD_SET(sockfd , &read_set);
         timeout.tv_sec = 0 ;
-        timeout.tv_usec = TIMEOUT;
+        timeout.tv_usec = TIMEOUT; // 5 secondes
 
-
-        
+        //Surveillance du socket avec select
         int activity = select(sockfd+1 , &read_set , NULL, NULL, &timeout);
         if (activity < 0)
         {
             perror("select()");
-            //exit(errno);
         }
 
         if (activity == 0)
         {
-            //time out
-            puts("delai d'attente depassé"); //TODO: a retirer
+            //timeout
+            puts("delai d'attente depassé"); 
+            if (ecriture_audio > 0)
+            {
+                //fermer le peripherique audio si le delai d'attente est depasse
+                close(ecriture_audio); 
+            }
             exit(0);
         }
 
-        if (FD_ISSET(sockfd,&read_set)) //premiere connexion du client
+        if (FD_ISSET(sockfd,&read_set))
         {
                 //***** recvfrome
            recvfd = lire_packet(sockfd , &addrserveur , &packRecu);
@@ -205,11 +205,12 @@ static void app(){
                perror("recvfrom()");
            }
 
-            //******* verification du type de packet nom de fichier
+            //******* verification du type de packet 
 
             switch (packRecu.type)
             {
-            case FILE_HEADER:
+            case FILE_HEADER: //premier packet du serveur au client
+            //recuperation des informations contenus dans le packet recu
             recup_audio_header(packRecu.message);
 
             ecriture_audio = aud_writeinit(audio_header.frequenceEchantillonnage ,
@@ -217,82 +218,77 @@ static void app(){
             audio_header.canal);
             if (ecriture_audio < 0)
             {
-                /* code */
                 exit(errno);
-                puts("impossible d'ouvrire le p audio");
+                puts("Impossible d'ouvrir le peripherique audio");
             }
             id = packRecu.id_client ;
-            create_packet(&packEnvoye , HEADER_MUSIC_RECU , AUCUN_MSG );
+            //le client signale au serveur qu'il a recu l' entete du fchier
+            create_packet(&packEnvoye , HEADER_MUSIC_RECU , AUCUN_MSG ); 
             envoye_packet(sockfd , &addrserveur , &packEnvoye);
             clear_packet(&packEnvoye);
             clear_packet(&packRecu);
             break;
 
-            case ECHANTILLON:
-            /* code */
+            case ECHANTILLON: // reception d'un echantillon de son
             if (write(ecriture_audio, packRecu.message , BUFFER_SIZE) < 0 )
             {
-                /* code */
                  puts("impossible de jouer le son");
                  exit(errno);
             }
             
-            create_packet(&packEnvoye , ACQUITTEMENT , AUCUN_MSG );
+            create_packet(&packEnvoye , ACQUITTEMENT , AUCUN_MSG ); //le client envoie un acquittement au serveur
             envoye_packet(sockfd , &addrserveur , &packEnvoye);
             clear_packet(&packEnvoye);
             clear_packet(&packRecu);
             break;
 
-            case MSG_ERREUR_SERVEUR_COMPLET:
-            /* code */
+            //les cas d'erreur de connection au serveur 
+            case MSG_ERREUR_SERVEUR_COMPLET:  
             puts ("le serveur est complet");
             en_ligne = false ; 
             break;
 
             case MSG_ERREUR_SON_INDISPONIBLE:
-            /* code */
             puts ("le son souhaite n'est pas disponible");
             en_ligne = false ;
             break;
 
             case MSG_ERREUR_CO_NON_AUTORISE:
-            /* code */
-            puts ("vous n'avez pas le droi de vous connnecter à ce serveur");
+            puts ("vous n'avez pas le droit de vous connnecter");
             en_ligne = false ;
             break;
 
             case MSG_ERREUR_LECTURE_AUDIO:
-            /* code */
             puts ("erreur lors de la lecture ");
             en_ligne = false ;
             break;
 
             case MSG_ERREUR_SOCKET:
-            /* code */
             puts ("probleme de connection : init socket");
             en_ligne = false ;
             break;
 
             case MSG_ERREUR_PORT:
-            /* code */
             puts ("probleme de connection : port");
             en_ligne = false ;
             break;
 
-            case FIN_DU_SON:
-            /* code */
-            puts ("lecture fini");
+            case FIN_DU_SON: // fin de la lecture 
+            puts ("Fin de lecture");
             en_ligne = false ;
+            close(ecriture_audio);
             break;
             
             default:
+            create_packet(&packEnvoye , MSG_ERREUR_CO_NON_AUTORISE, AUCUN_MSG);
+            envoye_packet(sockfd , &addrserveur , &packEnvoye);
+            clear_packet(&packEnvoye);
+            clear_packet(&packRecu);
                 break;
             }
            
         }
     }
-    
-    
 
 }
 
@@ -301,12 +297,12 @@ static void app(){
 static void fin(){
 
     fin_connexion(sockfd);
-    puts("fin de la lecture");
+    puts("Fermeture de l'application");
 
 }
 
 
-
+//// main ()
 int main(int argc, char const *argv[])
 {
     param ( argc, argv);

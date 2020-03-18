@@ -11,9 +11,6 @@ OBJDIR = obj
 # Liens
 #
 
-#bin/lecteur: obj/lecteur.o   obj/audio.o
-#			   gcc -g -o bin/lecteur obj/lecteur.o  obj/audio.o
-
 $(BINDIR)/audioserver: $(OBJDIR)/audioserver.o   $(OBJDIR)/audioserver.o
 			   @gcc -g -o $(BINDIR)/audioserver $(OBJDIR)/audioserver.o  $(OBJDIR)/audio.o
 
@@ -49,14 +46,14 @@ clean :
 #
 
 test_client : $(OBJDIR)/audioclient.o
-	   padsp ./$(BINDIR)/audioclient 
+	  @ padsp ./$(BINDIR)/audioclient 
 
 test_server : $(OBJDIR)/audioserver.o
-	    ./$(BINDIR)/audioserver 
+	  @  ./$(BINDIR)/audioserver 
 
 #
 #compiler tous les fichiers
 #
 all : 
-		make $(BINDIR)/audioclient  $(BINDIR)/audioserver
+		 make $(BINDIR)/audioclient  $(BINDIR)/audioserver
 
