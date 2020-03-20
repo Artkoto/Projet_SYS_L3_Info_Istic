@@ -1,2 +1,1 @@
-
- padsp ./bin/lecteur  $1 
+ padsp ./bin/audioclient $1 $2.wav
