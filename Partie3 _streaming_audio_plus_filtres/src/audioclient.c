@@ -318,7 +318,7 @@ static void app(){
 
             case ECHANTILLON: // reception d'un echantillon de son
             memset(audioBuffer, 0, BUFFER_SIZE);
-            for (int i = 0; i < BUFFER_SIZE/(audio_header.tailleEchantillonnage/8); i++)
+            for (int i = 0; i < BUFFER_SIZE/2; i++)
             {
                 *((int*)(audioBuffer + i*sizeof(int))) = 
                 *((int*)(packRecu.message + i*sizeof(int))) * volume ; //ajustement du volume du son
