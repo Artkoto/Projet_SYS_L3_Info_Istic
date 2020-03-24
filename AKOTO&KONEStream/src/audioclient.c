@@ -85,6 +85,8 @@ static void param (int argc, char const *argv[]){
                 if (param_filtre < VOLUME_PARAMETER_MIN || param_filtre > VOLUME_PARAMETER_MAX)
                 {
                    perror("parametre invalide");
+                   puts("volume minimum : 1");
+                   puts("volume minimum : 4");
                    exit(0);
                 }
                 
@@ -96,6 +98,8 @@ static void param (int argc, char const *argv[]){
                 if (param_filtre < VITESSE_PARAMETER_MIN || param_filtre > VITESSE_PARAMETER_MAX)
                 {
                    perror("parametre invalide");
+                   puts("vitesse minimale : -3");
+                   puts("vitesse maximale : 3");
                    exit(0);
                 }
 

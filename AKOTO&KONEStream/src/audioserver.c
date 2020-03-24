@@ -451,7 +451,7 @@ static void app(){
                         clear_packet(&packRecu);
                     }
                 }
-                if (listClient[i].delait_attente >= 12)
+                if (listClient[i].delait_attente >= 20)
                     {
                         remove_client(i);
                         printf("# Le client (%d) s'est déconnecte !\n" , i+1 );

@@ -45,10 +45,7 @@ clean :
 # Tester les chichiers
 #
 
-test_client : $(OBJDIR)/audioclient.o
-	  @ padsp ./$(BINDIR)/audioclient 
-
-test_server : $(OBJDIR)/audioserver.o
+test : $(OBJDIR)/audioserver.o
 	  @  ./$(BINDIR)/audioserver 
 
 #
