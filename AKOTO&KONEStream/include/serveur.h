@@ -31,7 +31,7 @@
 
 
 // Timeouts
-#define TIMEOUT 4000000  // 4 seconds
+#define TIMEOUT 3000000  // 3 seconds
 
 // Message types
 #define VIDE 0 

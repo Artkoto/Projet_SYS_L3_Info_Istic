@@ -150,6 +150,16 @@ ainsi que les fonctions suivantes :
     8)  si le packet est un message d'erreur ou la fin de la lecture :le client ferme son programme
 
 
+
+                    #LES FILTRES
+
+    Les filtres disponibles son les suivante :
+    > mono (sans parametre)
+    > volume [1 .. 4]
+    > vitesse [-3 .. 3]
+
+
+
                     #INDICATIONS
 
     Pour utiliser nos programmes,  nous avons mis à votre disposition, duex fichiers "client.sh" 
@@ -161,6 +171,6 @@ ainsi que les fonctions suivantes :
 
     Après avoir allumé le serveur, vous pouvez de mander la lecture des sons dans un invite de commande par exemple :  
    
-> ./run.sh 127.0.0.1 test 
+> ./client.sh 127.0.0.1 test mono vitesse 2 volume 3
 
 ça marche aussi avec deux ordinateurs en réseau mais la qualité du son est moins bonne qu'en localhost.

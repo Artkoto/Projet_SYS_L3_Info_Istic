@@ -85,6 +85,8 @@ static void param (int argc, char const *argv[]){
                 if (param_filtre < VOLUME_PARAMETER_MIN || param_filtre > VOLUME_PARAMETER_MAX)
                 {
                    perror("parametre invalide");
+                   puts("volume minimum : 1");
+                   puts("volume minimum : 4");
                    exit(0);
                 }
                 
@@ -96,6 +98,8 @@ static void param (int argc, char const *argv[]){
                 if (param_filtre < VITESSE_PARAMETER_MIN || param_filtre > VITESSE_PARAMETER_MAX)
                 {
                    perror("parametre invalide");
+                   puts("vitesse minimale : -3");
+                   puts("vitesse maximale : 3");
                    exit(0);
                 }
 
@@ -144,24 +148,24 @@ static void recup_audio_header( char *header){
 							token = strtok(NULL, " ");
 							i++;
 						}
-                        
+                        //recuerer les filtres
     char *token2 = strtok(Parametre , " ");
 						
 						while ((token2 != NULL)) {
 							switch (atoi(token2)) {
 
-								//
+								//mono
 								case MONO:
                                 audio_header.canal = 1 ;
                                 break;
 
-								// 
+								// le volume 
 								case VOLUME:
                                 token2 = strtok(NULL, " ");
                                 volume = atoi(token2);
                                 break;
 
-                                // 
+                                // la vitesse 
 								case VITESSE:
                                 token2 = strtok(NULL, " ");
                                 if (atoi(token2) >= 0 )
@@ -206,7 +210,6 @@ static int init_connexion(const char *address, struct  sockaddr_in * addrserveur
     addrserveur->sin_addr.s_addr    = inet_addr(address);
 
     return sockfd ;
-
 }
 
 ///////////fermer  une sconnexion ////////////////
@@ -225,7 +228,6 @@ static void envoye_packet(int sock, struct  sockaddr_in *addrclient, struct pack
       exit(errno);
    }
 }
-
 
 ////////////    lire un packet      //////////////////////////
 static socklen_t lire_packet(int sock, struct  sockaddr_in *addrserveur, struct packet *buffer){
@@ -255,7 +257,6 @@ static void init(){
     create_packet(&packEnvoye , FILENAME ,filename);
     envoye_packet(sockfd , &addrserveur , &packEnvoye); // envoie du premier packet (filename)
     clear_packet(&packEnvoye);
- 
 }
 
 ///  corp du programme    //////////////
@@ -321,10 +322,10 @@ static void app(){
 
             case ECHANTILLON: // reception d'un echantillon de son
             memset(audioBuffer, 0, BUFFER_SIZE);
-            for (int i = 0; i < BUFFER_SIZE/(audio_header.tailleEchantillonnage/8); i++)
+            for (int i = 0; i < BUFFER_SIZE/2; i++)
             {
                 *((int*)(audioBuffer + i*sizeof(int))) = 
-                *((int*)(packRecu.message + i*sizeof(int))) * volume ;
+                *((int*)(packRecu.message + i*sizeof(int))) * volume ; //ajustement du volume du son
             }
             
             if (write(ecriture_audio, audioBuffer , BUFFER_SIZE) < 0 )
